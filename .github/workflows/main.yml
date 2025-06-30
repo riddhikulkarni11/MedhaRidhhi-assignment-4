@@ -1,4 +1,5 @@
-name: Truffle DApp Build and Deploy
+name: Build and Deploy
+ 
 on:
   push:
     branches:
@@ -6,53 +7,69 @@ on:
   pull_request:
     branches:
       - master
+  workflow_dispatch:
+ 
 jobs:
   build:
     runs-on: ubuntu-latest
+ 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v3
-    - name: Set up Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '15.8.0'
-    - name: Install npm 7.5.1
-      run: npm install -g npm@7.5.1
-    - name: Install Truffle
-      run: npm install -g truffle@5.6.7
-    - name: Install project dependencies
-      run: npm install
-    - name: Compile smart contracts
-      run: truffle compile
-    - name: Run tests (optional)
-      run: truffle test
-    - name: Upload build artifacts
-      uses: actions/upload-artifact@v4.3.1
-      with:
-        name: truffle-build
-        path: build/
+      - name: Checkout code
+        uses: actions/checkout@v3
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+ 
+      - name: Install dependencies
+        run: npm install
+ 
+      - name: Use Secret in Build
+        run: |
+          echo "Using secret in build step..."
+          echo "First 4 characters of secret: ${MY_SECRET:0:4}"
+        env:
+          MY_SECRET: ${{ secrets.MY_SECRET }}
+ 
+      - name: Run Build (optional)
+        run: npm run build || echo "No build script defined"
+ 
+      - name: Create zip artifact
+        run: |
+          mkdir -p output
+          zip -r output/fake-product-identification.zip .
+ 
+      - name: Upload artifact to GitHub
+        uses: actions/upload-artifact@v4
+        with:
+          name: project-package
+          path: output/fake-product-identification.zip
+ 
   deploy:
     needs: build
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
+ 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v3
-    - name: Set up Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '15.8.0'
-    - name: Install npm 7.5.1
-      run: npm install -g npm@7.5.1
-    - name: Install Truffle
-      run: npm install -g truffle@5.6.7
-    - name: Install project dependencies
-      run: npm install
-    - name: Compile contracts
-      run: truffle compile
-    - name: Deploy to network
-      run: truffle migrate --network 
-      # Optional: Use secrets for private keys or Infura
-      env:
-        MNEMONIC: ${{ secrets.MNEMONIC }}
-        INFURA_API_KEY: ${{ secrets.INFURA_API_KEY }}
+      - name: Checkout code
+        uses: actions/checkout@v3
+ 
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+ 
+      - name: Install dependencies
+        run: npm install
+ 
+      - name: Install Truffle and Ganache CLI
+        run: |
+          npm install -g truffle ganache
+ 
+      - name: Start Ganache CLI
+        run: |
+          nohup ganache --port 7545 --networkId 5777 > ganache.log &
+          sleep 5
+ 
+      - name: Run Truffle Tests
+        run: npx truffle test
+ 
